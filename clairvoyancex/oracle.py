@@ -1,5 +1,3 @@
-import requests
-
 import re
 import logging
 from typing import Any
@@ -8,7 +6,7 @@ from typing import List
 from typing import Dict
 from typing import Optional
 
-from clairvoyance import graphql
+from clairvoyancex import graphql
 
 
 def get_valid_fields(error_message: str) -> Set:
@@ -66,41 +64,45 @@ def probe_valid_fields(
     # then remove fields that produce an error message
     valid_fields = set(wordlist)
 
-    for i in range(0, len(wordlist), config.bucket_size):
-        bucket = wordlist[i : i + config.bucket_size]
-
-        document = input_document.replace("FUZZ", " ".join(bucket))
-
-        response = graphql.post(
-            config.url,
-            headers=config.headers,
-            json={"query": document},
-            verify=config.verify,
-        )
-        errors = response.json()["errors"]
-        logging.debug(
-            f"Sent {len(bucket)} fields, recieved {len(errors)} errors in {response.elapsed.total_seconds()} seconds"
-        )
-
-        for error in errors:
-            error_message = error["message"]
-
-            if (
-                "must not have a selection since type" in error_message
-                and "has no subfields" in error_message
-            ):
-                return set()
-
-            # First remove field if it produced an "Cannot query field" error
-            match = re.search(
-                'Cannot query field "(?P<invalid_field>[_A-Za-z][_0-9A-Za-z]*)"',
-                error_message,
+    with graphql.new_client(
+            http2=config.http2,
+            verify=config.verify
+            ) as client:
+        for i in range(0, len(wordlist), config.bucket_size):
+            bucket = wordlist[i : i + config.bucket_size]
+    
+            document = input_document.replace("FUZZ", " ".join(bucket))
+    
+            response = graphql.post(
+                client,
+                config.url,
+                headers=config.headers,
+                json={"query": document},
             )
-            if match:
-                valid_fields.discard(match.group("invalid_field"))
-
-            # Second obtain field suggestions from error message
-            valid_fields |= get_valid_fields(error_message)
+            errors = response.json()["errors"]
+            logging.debug(
+                f"Sent {len(bucket)} fields, recieved {len(errors)} errors in {response.elapsed.total_seconds()} seconds"
+            )
+    
+            for error in errors:
+                error_message = error["message"]
+    
+                if (
+                    "must not have a selection since type" in error_message
+                    and "has no subfields" in error_message
+                ):
+                    return set()
+    
+                # First remove field if it produced an "Cannot query field" error
+                match = re.search(
+                    'Cannot query field "(?P<invalid_field>[_A-Za-z][_0-9A-Za-z]*)"',
+                    error_message,
+                )
+                if match:
+                    valid_fields.discard(match.group("invalid_field"))
+    
+                # Second obtain field suggestions from error message
+                valid_fields |= get_valid_fields(error_message)
 
     return valid_fields
 
@@ -114,13 +116,17 @@ def probe_valid_args(
         "FUZZ", f"{field}({', '.join([w + ': 7' for w in wordlist])})"
     )
 
-    response = graphql.post(
-        config.url,
-        headers=config.headers,
-        json={"query": document},
-        verify=config.verify,
-    )
-    errors = response.json()["errors"]
+    with graphql.new_client(
+            http2=config.http2,
+            verify=config.verify
+            ) as client:
+        response = graphql.post(
+            client,
+            config.url,
+            headers=config.headers,
+            json={"query": document},
+        )
+        errors = response.json()["errors"]
 
     for error in errors:
         error_message = error["message"]
@@ -218,13 +224,17 @@ def probe_input_fields(
 
     document = f"mutation {{ {field}({argument}: {{ {', '.join([w + ': 7' for w in wordlist])} }}) }}"
 
-    response = graphql.post(
-        config.url,
-        headers=config.headers,
-        json={"query": document},
-        verify=config.verify,
-    )
-    errors = response.json()["errors"]
+    with graphql.new_client(
+            http2=config.http2,
+            verify=config.verify
+            ) as client:
+        response = graphql.post(
+            client,
+            config.url,
+            headers=config.headers,
+            json={"query": document},
+        )
+        errors = response.json()["errors"]
 
     for error in errors:
         error_message = error["message"]
@@ -309,19 +319,23 @@ def probe_typeref(
 ) -> Optional[graphql.TypeRef]:
     typeref = None
 
-    for document in documents:
-        response = graphql.post(
-            config.url,
-            headers=config.headers,
-            json={"query": document},
-            verify=config.verify,
-        )
-        errors = response.json().get("errors", [])
+    with graphql.new_client(
+            http2=config.http2,
+            verify=config.verify
+            ) as client:
+        for document in documents:
+            response = graphql.post(
+                client,
+                config.url,
+                headers=config.headers,
+                json={"query": document},
+            )
+            errors = response.json().get("errors", [])
 
-        for error in errors:
-            typeref = get_typeref(error["message"], context)
-            if typeref:
-                return typeref
+            for error in errors:
+                typeref = get_typeref(error["message"], context)
+                if typeref:
+                    return typeref
 
     if not typeref:
         raise Exception(f"Unable to get TypeRef for {documents}")
@@ -359,13 +373,17 @@ def probe_typename(input_document: str, config: graphql.Config) -> str:
     wrong_field = "imwrongfield"
     document = input_document.replace("FUZZ", wrong_field)
 
-    response = graphql.post(
-        config.url,
-        headers=config.headers,
-        json={"query": document},
-        verify=config.verify,
-    )
-    errors = response.json()["errors"]
+    with graphql.new_client(
+            http2=config.http2,
+            verify=config.verify
+            ) as client:
+        response = graphql.post(
+            client,
+            config.url,
+            headers=config.headers,
+            json={"query": document},
+        )
+        errors = response.json()["errors"]
 
     wrong_field_regexes = [
         f'Cannot query field "{wrong_field}" on type "(?P<typename>[_0-9a-zA-Z\[\]!]*)".',
@@ -404,17 +422,21 @@ def fetch_root_typenames(config: graphql.Config) -> Dict[str, Optional[str]]:
         "subscriptionType": None,
     }
 
-    for name, document in documents.items():
-        response = graphql.post(
-            config.url,
-            headers=config.headers,
-            json={"query": document},
-            verify=config.verify,
-        )
-        data = response.json().get("data", {})
-
-        if data:
-            typenames[name] = data["__typename"]
+    with graphql.new_client(
+            http2=config.http2,
+            verify=config.verify
+            ) as client:
+        for name, document in documents.items():
+            response = graphql.post(
+                client,
+                config.url,
+                headers=config.headers,
+                json={"query": document},
+            )
+            data = response.json().get("data", {})
+    
+            if data:
+                typenames[name] = data["__typename"]
 
     logging.debug(f"Root typenames are: {typenames}")
 

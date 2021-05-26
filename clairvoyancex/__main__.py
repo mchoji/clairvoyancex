@@ -3,8 +3,8 @@ import logging
 import argparse
 from typing import Dict
 
-from clairvoyance import graphql
-from clairvoyance import oracle
+from clairvoyancex import graphql
+from clairvoyancex import oracle
 
 
 def parse_args():
@@ -18,6 +18,11 @@ def parse_args():
         "--insecure",
         action="store_true",
         help="Disable server's certificate verification",
+    )
+    parser.add_argument(
+        "--http2",
+        action="store_true",
+        help="Issue requests using HTTP version 2",
     )
     parser.add_argument(
         "-i",
@@ -65,7 +70,6 @@ if __name__ == "__main__":
 
     format = "[%(levelname)s][%(asctime)s %(filename)s:%(lineno)d]\t%(message)s"
     datefmt = "%Y-%m-%d %H:%M:%S"
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
     if args.v == 1:
         level = logging.INFO
     elif args.v > 1:
@@ -77,6 +81,7 @@ if __name__ == "__main__":
     config = graphql.Config()
     config.url = args.url
     config.verify = not args.insecure
+    config.http2 = args.http2
     for h in args.headers:
         key, value = h.split(": ", 1)
         config.headers[key] = value
@@ -90,6 +95,11 @@ if __name__ == "__main__":
             input_schema = json.load(f)
 
     input_document = args.document if args.document else None
+
+    # check HTTP version used by server
+    with graphql.new_client(http2=config.http2, verify=config.verify) as client:
+        response = client.get(config.url)
+        logging.info(f"Target server is using {response.http_version}")
 
     ignore = {"Int", "Float", "String", "Boolean", "ID"}
     while True:

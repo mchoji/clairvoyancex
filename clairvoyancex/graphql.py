@@ -1,8 +1,4 @@
-import urllib3
-import requests
-from urllib3.exceptions import InsecureRequestWarning
-
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+import httpx
 
 import json
 import logging
@@ -12,31 +8,14 @@ from typing import Any
 from typing import Set
 
 
-def post(url, data=None, json=None, **kwargs):
-    session = requests.Session()
+def new_client(**kwargs):
+    transport = httpx.HTTPTransport(retries=5)
+    client = httpx.Client(transport=transport, **kwargs)
+    return client
 
-    retries = urllib3.util.Retry(
-        status=5,
-        method_whitelist={
-            "DELETE",
-            "GET",
-            "HEAD",
-            "OPTIONS",
-            "PUT",
-            "TRACE",
-            "POST",
-        },
-        status_forcelist=range(500, 600),
-        backoff_factor=2,
-    )
 
-    adapter = requests.adapters.HTTPAdapter(max_retries=retries)
-
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-
-    response = session.post(url, data=data, json=json, **kwargs)
-
+def post(client, url, data=None, json=None, **kwargs):
+    response = client.post(url, data=data, json=json, **kwargs)
     return response
 
 
@@ -159,6 +138,7 @@ class Config:
     def __init__(self):
         self.url = ""
         self.verify = True
+        self.http2 = False
         self.headers = dict()
         self.bucket_size = 4096
 
