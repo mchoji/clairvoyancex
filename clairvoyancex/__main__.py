@@ -10,7 +10,8 @@ from clairvoyancex import oracle
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    defaults = {"document": "query { FUZZ }"}
+    defaults = {"document": "query { FUZZ }",
+                "command": "POST"}
 
     parser.add_argument("-v", default=0, action="count")
     parser.add_argument(
@@ -42,7 +43,22 @@ def parse_args():
         "--document",
         metavar="<string>",
         default=defaults["document"],
-        help=f"Start with this document (default {defaults['document']})",
+        help=f"Start with this document (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-x",
+        "--proxy",
+        metavar="[protocol://]host[:port]",
+        help="Use this proxy",
+    )
+    parser.add_argument(
+        "-X",
+        "--request",
+        dest="command",
+        metavar="<command>",
+        choices=["GET", "POST"],
+        default=defaults["command"],
+        help="Specify request command to  use (default: %(default)s). Options: %(choices)s",
     )
     parser.add_argument(
         "-H",
@@ -82,6 +98,8 @@ if __name__ == "__main__":
     config.url = args.url
     config.verify = not args.insecure
     config.http2 = args.http2
+    config.proxy = args.proxy
+    config.command = args.command
     for h in args.headers:
         key, value = h.split(": ", 1)
         config.headers[key] = value

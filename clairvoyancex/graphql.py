@@ -19,6 +19,18 @@ def post(client, url, data=None, json=None, **kwargs):
     return response
 
 
+def get(client, url, params=None, **kwargs):
+    response = client.get(url, params=params, **kwargs)
+    return response
+
+
+def request(command, client, url, params=None, data=None, json=None, **kwargs):
+    if command == "POST":
+        return post(client, url, params=params, data=data, json=json, **kwargs)
+    elif command == "GET":
+        return get(client, url, params=json, **kwargs)
+
+
 class Schema:
     def __init__(
         self,

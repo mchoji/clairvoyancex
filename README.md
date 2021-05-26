@@ -11,9 +11,9 @@ Clairvoyance allows us to get GraphQL API schema when introspection is disabled.
 The major difference is that this project relies on `httpx` instead of `requests` for issuing HTTP requests. This allows `clairvoyancex` to communicate with servers that use protocol HTTP/2 by default and it is a step forward towards implementing async requests.
 In summary, these are the main differences from the original project:
   - Requests using `httpx` package;
-  - Support for proxying requests (TO-DO);
+  - Support for proxying requests;
   - HTTP/2 support;
-  - Custom request method defined at command-line (TO-DO).
+  - Custom request method defined at command-line.
 
 ## Installation
 
@@ -31,11 +31,11 @@ $ pip install -r requirements.txt
 ## Usage
 
 ```
-$ poetry run python -m clairvoyance --help
+$ poetry run python -m clairvoyancex --help
 ```
 
 ```
-$ poetry run python -m clairvoyance -vv -o /path/to/schema.json -w /path/to/wordlist.txt https://swapi-graphql.netlify.app/.netlify/functions/index
+$ poetry run python -m clairvoyancex -vv -o /path/to/schema.json -w /path/to/wordlist.txt https://swapi-graphql.netlify.app/.netlify/functions/index
 ```
 
 You can refer to 2nd half of [GraphQL APIs from bug hunter's perspective by Nikita Stupin](https://youtu.be/nPB8o0cSnvM) talk for detailed description.

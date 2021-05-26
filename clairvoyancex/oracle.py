@@ -5,6 +5,7 @@ from typing import Set
 from typing import List
 from typing import Dict
 from typing import Optional
+from json.decoder import JSONDecodeError
 
 from clairvoyancex import graphql
 
@@ -66,14 +67,16 @@ def probe_valid_fields(
 
     with graphql.new_client(
             http2=config.http2,
-            verify=config.verify
+            verify=config.verify,
+            proxies=config.proxy,
             ) as client:
         for i in range(0, len(wordlist), config.bucket_size):
             bucket = wordlist[i : i + config.bucket_size]
     
             document = input_document.replace("FUZZ", " ".join(bucket))
     
-            response = graphql.post(
+            response = graphql.request(
+                config.command,
                 client,
                 config.url,
                 headers=config.headers,
@@ -118,9 +121,11 @@ def probe_valid_args(
 
     with graphql.new_client(
             http2=config.http2,
-            verify=config.verify
+            verify=config.verify,
+            proxies=config.proxy,
             ) as client:
-        response = graphql.post(
+        response = graphql.request(
+            config.command,
             client,
             config.url,
             headers=config.headers,
@@ -226,9 +231,11 @@ def probe_input_fields(
 
     with graphql.new_client(
             http2=config.http2,
-            verify=config.verify
+            verify=config.verify,
+            proxies=config.proxy,
             ) as client:
-        response = graphql.post(
+        response = graphql.request(
+            config.command,
             client,
             config.url,
             headers=config.headers,
@@ -321,10 +328,12 @@ def probe_typeref(
 
     with graphql.new_client(
             http2=config.http2,
-            verify=config.verify
+            verify=config.verify,
+            proxies=config.proxy,
             ) as client:
         for document in documents:
-            response = graphql.post(
+            response = graphql.request(
+                config.command,
                 client,
                 config.url,
                 headers=config.headers,
@@ -375,9 +384,11 @@ def probe_typename(input_document: str, config: graphql.Config) -> str:
 
     with graphql.new_client(
             http2=config.http2,
-            verify=config.verify
+            verify=config.verify,
+            proxies=config.proxy,
             ) as client:
-        response = graphql.post(
+        response = graphql.request(
+            config.command,
             client,
             config.url,
             headers=config.headers,
@@ -424,19 +435,24 @@ def fetch_root_typenames(config: graphql.Config) -> Dict[str, Optional[str]]:
 
     with graphql.new_client(
             http2=config.http2,
-            verify=config.verify
+            verify=config.verify,
+            proxies=config.proxy,
             ) as client:
         for name, document in documents.items():
-            response = graphql.post(
+            response = graphql.request(
+                config.command,
                 client,
                 config.url,
                 headers=config.headers,
                 json={"query": document},
             )
-            data = response.json().get("data", {})
-    
-            if data:
-                typenames[name] = data["__typename"]
+            try:
+                data = response.json().get("data", {})
+            except JSONDecodeError as err:
+                logging.error(f'Caught exception JSONDecodeError: {err}')
+            else:
+                if data:
+                    typenames[name] = data["__typename"]
 
     logging.debug(f"Root typenames are: {typenames}")
 
