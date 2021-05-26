@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "clairvoyancex"
+version = "0.1.0"
+description = "A tool for retrieving GraphQL API schema when introspection is disabled"
+authors = ["mchoji <mchoji@users.noreply.github.com>"]
+license = "Apache"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+httpx = {extras = ["http2"], version = "<1.0"}
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
