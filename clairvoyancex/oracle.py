@@ -76,10 +76,11 @@ def probe_valid_fields(
             document = input_document.replace("FUZZ", " ".join(bucket))
     
             response = graphql.request(
-                config.command,
-                client,
-                config.url,
+                client=client,
+                command=config.command,
+                url=config.url,
                 headers=config.headers,
+                params=config.params,
                 json={"query": document},
             )
             errors = response.json()["errors"]
@@ -125,10 +126,11 @@ def probe_valid_args(
             proxies=config.proxy,
             ) as client:
         response = graphql.request(
-            config.command,
-            client,
-            config.url,
+            client=client,
+            command=config.command,
+            url=config.url,
             headers=config.headers,
+            params=config.params,
             json={"query": document},
         )
         errors = response.json()["errors"]
@@ -235,10 +237,11 @@ def probe_input_fields(
             proxies=config.proxy,
             ) as client:
         response = graphql.request(
-            config.command,
-            client,
-            config.url,
+            client=client,
+            command=config.command,
+            url=config.url,
             headers=config.headers,
+            params=config.params,
             json={"query": document},
         )
         errors = response.json()["errors"]
@@ -333,10 +336,11 @@ def probe_typeref(
             ) as client:
         for document in documents:
             response = graphql.request(
-                config.command,
-                client,
-                config.url,
+                client=client,
+                command=config.command,
+                url=config.url,
                 headers=config.headers,
+                params=config.params,
                 json={"query": document},
             )
             errors = response.json().get("errors", [])
@@ -388,10 +392,11 @@ def probe_typename(input_document: str, config: graphql.Config) -> str:
             proxies=config.proxy,
             ) as client:
         response = graphql.request(
-            config.command,
-            client,
-            config.url,
+            client=client,
+            command=config.command,
+            url=config.url,
             headers=config.headers,
+            params=config.params,
             json={"query": document},
         )
         errors = response.json()["errors"]
@@ -440,10 +445,11 @@ def fetch_root_typenames(config: graphql.Config) -> Dict[str, Optional[str]]:
             ) as client:
         for name, document in documents.items():
             response = graphql.request(
-                config.command,
-                client,
-                config.url,
+                client=client,
+                command=config.command,
+                url=config.url,
                 headers=config.headers,
+                params=config.params,
                 json={"query": document},
             )
             try:

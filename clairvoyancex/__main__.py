@@ -1,6 +1,7 @@
 import json
 import logging
 import argparse
+import re
 from typing import Dict
 
 from clairvoyancex import graphql
@@ -23,14 +24,15 @@ def parse_args():
     parser.add_argument(
         "--http2",
         action="store_true",
-        help="Issue requests using HTTP version 2",
+        help="Enable use of HTTP version 2",
     )
     parser.add_argument(
         "-i",
         "--input",
         metavar="<file>",
         type=argparse.FileType("r"),
-        help="Input file containing JSON schema which will be supplemented with obtained information",
+        help="Input file containing JSON schema which will be supplemented"
+                + " with obtained information",
     )
     parser.add_argument(
         "-o",
@@ -58,7 +60,8 @@ def parse_args():
         metavar="<command>",
         choices=["GET", "POST"],
         default=defaults["command"],
-        help="Specify request command to  use (default: %(default)s). Options: %(choices)s",
+        help="Specify request command to  use (default: %(default)s)."
+                + " Options: %(choices)s",
     )
     parser.add_argument(
         "-H",
@@ -67,6 +70,18 @@ def parse_args():
         dest="headers",
         action="append",
         default=[],
+        help="Pass custom header(s) to server"
+                + " (e.g. \"User-Agent: custom\"). Can be used multiple times",
+    )
+    parser.add_argument(
+        "-P",
+        "--param",
+        metavar="<param>",
+        dest="params",
+        action="append",
+        default=[],
+        help="Pass custom parameter(s) in URL"
+                + " (e.g. \"env: prod\"). Can be used mutiple times",
     )
     parser.add_argument(
         "-w",
@@ -74,7 +89,8 @@ def parse_args():
         metavar="<file>",
         required=True,
         type=argparse.FileType("r"),
-        help="This wordlist will be used for all brute force effots (fields, arguments and so on)",
+        help="This wordlist will be used for all brute force effots"
+                + " (i.e. fields, arguments and so on)",
     )
     parser.add_argument("url")
 
@@ -101,8 +117,11 @@ if __name__ == "__main__":
     config.proxy = args.proxy
     config.command = args.command
     for h in args.headers:
-        key, value = h.split(": ", 1)
+        key, value = re.split(": ?", h, 1)
         config.headers[key] = value
+    for p in args.params:
+        key, value = re.split(": ?", p, 1)
+        config.params[key] = value
 
     with args.wordlist as f:
         wordlist = [w.strip() for w in f.readlines() if w.strip()]
@@ -115,9 +134,22 @@ if __name__ == "__main__":
     input_document = args.document if args.document else None
 
     # check HTTP version used by server
-    with graphql.new_client(http2=config.http2, verify=config.verify) as client:
-        response = client.get(config.url)
-        logging.info(f"Target server is using {response.http_version}")
+    with graphql.new_client(
+            verify=config.verify,
+            proxies=config.proxy,
+            http2=config.http2,
+            ) as client:
+        response = graphql.request(
+                client=client,
+                command=config.command,
+                url=config.url,
+                params=config.params,
+                json={"query": "{__schema{types{name}}}"}
+                )
+        if response:
+            logging.info(f"Target server is using {response.http_version}")
+        else:
+            logging.warning(f"Could not retrieve HTTP version from server")
 
     ignore = {"Int", "Float", "String", "Boolean", "ID"}
     while True:

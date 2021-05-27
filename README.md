@@ -13,7 +13,8 @@ In summary, these are the main differences from the original project:
   - Requests using `httpx` package;
   - Support for proxying requests;
   - HTTP/2 support;
-  - Custom request method defined at command-line.
+  - Custom request method defined at command-line;
+  - Custom URL parameters defined at command-line.
 
 ## Installation
 

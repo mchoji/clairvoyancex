@@ -2,6 +2,8 @@ import httpx
 
 import json
 import logging
+from httpcore import ConnectError
+from httpx import ProxyError
 from typing import List
 from typing import Dict
 from typing import Any
@@ -15,20 +17,36 @@ def new_client(**kwargs):
 
 
 def post(client, url, data=None, json=None, **kwargs):
-    response = client.post(url, data=data, json=json, **kwargs)
-    return response
+    try:
+        response = client.post(url, data=data, json=json, **kwargs)
+    except ConnectError as err:
+        logging.error(f'Connection error: {err}') 
+        raise
+    except ProxyError as err:
+        logging.error(f'Proxy error: {err}')
+        raise
+    else:
+        return response
 
 
 def get(client, url, params=None, **kwargs):
-    response = client.get(url, params=params, **kwargs)
-    return response
+    try:
+        response = client.get(url, params=params, **kwargs)
+    except ConnectError as err:
+        logging.error(f'Connection error: {err}')
+        raise
+    except ProxyError as err:
+        logging.error(f'Proxy error: {err}')
+        raise
+    else:
+        return response
 
 
 def request(command, client, url, params=None, data=None, json=None, **kwargs):
     if command == "POST":
         return post(client, url, params=params, data=data, json=json, **kwargs)
     elif command == "GET":
-        return get(client, url, params=json, **kwargs)
+        return get(client, url, params={**params, **json}, **kwargs)
 
 
 class Schema:
@@ -149,10 +167,13 @@ class Schema:
 class Config:
     def __init__(self):
         self.url = ""
+        self.command = ""
+        self.bucket_size = 4096
         self.verify = True
         self.http2 = False
         self.headers = dict()
-        self.bucket_size = 4096
+        self.params = dict()
+        self.proxy = None
 
 
 class TypeRef:
