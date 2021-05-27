@@ -454,8 +454,8 @@ def fetch_root_typenames(config: graphql.Config) -> Dict[str, Optional[str]]:
             )
             try:
                 data = response.json().get("data", {})
-            except JSONDecodeError as err:
-                logging.error(f'Caught exception JSONDecodeError: {err}')
+            except JSONDecodeError:
+                logging.error(f'Caught exception JSONDecodeError for request using values {name=} and {document=}')
             else:
                 if data:
                     typenames[name] = data["__typename"]
