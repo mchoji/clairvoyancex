@@ -90,13 +90,13 @@ def probe_valid_fields(
             except ReadTimeout:
                 logging.warning('Timeout on function probe_valid_fields with value '
                     + f'{document=}. Try increasing timeout with option "-t". Skipping request')
-                next
+                continue
 
             try:
                 errors = response.json().get("errors", [])
             except JSONDecodeError:
                 logging.warning(f'Invalid response for request with {document=}')
-                next
+                continue 
             else:
                 logging.debug(
                     f"Sent {len(bucket)} fields, recieved {len(errors)} errors in {response.elapsed.total_seconds()} seconds"
@@ -539,7 +539,7 @@ def clairvoyance(
     for field_name in valid_mutation_fields:
         typeref = probe_field_type(field_name, config, input_document)
         if typeref is None:
-            next
+            continue 
         field = graphql.Field(field_name, typeref)
 
         if field.type.name not in ["Int", "Float", "String", "Boolean", "ID"]:
@@ -550,7 +550,7 @@ def clairvoyance(
                     field.name, arg_name, config, input_document
                 )
                 if arg_typeref is None:
-                    next
+                    continue 
                 arg = graphql.InputValue(arg_name, arg_typeref)
 
                 field.args.append(arg)
