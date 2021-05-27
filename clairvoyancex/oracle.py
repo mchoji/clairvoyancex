@@ -5,6 +5,7 @@ from typing import Set
 from typing import List
 from typing import Dict
 from typing import Optional
+from httpx import ReadTimeout
 from json.decoder import JSONDecodeError
 
 from clairvoyancex import graphql
@@ -69,24 +70,37 @@ def probe_valid_fields(
             http2=config.http2,
             verify=config.verify,
             proxies=config.proxy,
+            timeout=config.timeout,
             ) as client:
         for i in range(0, len(wordlist), config.bucket_size):
             bucket = wordlist[i : i + config.bucket_size]
     
             document = input_document.replace("FUZZ", " ".join(bucket))
     
-            response = graphql.request(
-                client=client,
-                command=config.command,
-                url=config.url,
-                headers=config.headers,
-                params=config.params,
-                json={"query": document},
-            )
-            errors = response.json()["errors"]
-            logging.debug(
-                f"Sent {len(bucket)} fields, recieved {len(errors)} errors in {response.elapsed.total_seconds()} seconds"
-            )
+            # TODO: implement retries in case of failure
+            try:
+                response = graphql.request(
+                    client=client,
+                    command=config.command,
+                    url=config.url,
+                    headers=config.headers,
+                    params=config.params,
+                    json={"query": document},
+                )
+            except ReadTimeout:
+                logging.warning('Timeout on function probe_valid_fields with value '
+                    + f'{document=}. Try increasing timeout with option "-t". Skipping request')
+                next
+
+            try:
+                errors = response.json().get("errors", [])
+            except JSONDecodeError:
+                logging.warning(f'Invalid response for request with {document=}')
+                next
+            else:
+                logging.debug(
+                    f"Sent {len(bucket)} fields, recieved {len(errors)} errors in {response.elapsed.total_seconds()} seconds"
+                )
     
             for error in errors:
                 error_message = error["message"]
@@ -124,16 +138,23 @@ def probe_valid_args(
             http2=config.http2,
             verify=config.verify,
             proxies=config.proxy,
+            timeout=config.timeout,
             ) as client:
-        response = graphql.request(
-            client=client,
-            command=config.command,
-            url=config.url,
-            headers=config.headers,
-            params=config.params,
-            json={"query": document},
-        )
-        errors = response.json()["errors"]
+        try:
+            response = graphql.request(
+                client=client,
+                command=config.command,
+                url=config.url,
+                headers=config.headers,
+                params=config.params,
+                json={"query": document},
+            )
+        except ReadTimeout:
+            logging.warning('Timeout on function probe_valid_args with value '
+                + f'{document=}. Try increasing timeout with option "-t". Skipping request')
+            return set()
+        else:
+            errors = response.json().get("errors", [])
 
     for error in errors:
         error_message = error["message"]
@@ -235,16 +256,23 @@ def probe_input_fields(
             http2=config.http2,
             verify=config.verify,
             proxies=config.proxy,
+            timeout=config.timeout,
             ) as client:
-        response = graphql.request(
-            client=client,
-            command=config.command,
-            url=config.url,
-            headers=config.headers,
-            params=config.params,
-            json={"query": document},
-        )
-        errors = response.json()["errors"]
+        try:
+            response = graphql.request(
+                client=client,
+                command=config.command,
+                url=config.url,
+                headers=config.headers,
+                params=config.params,
+                json={"query": document},
+            )
+        except ReadTimeout:
+            logging.warning('Timeout on function probe_input_fields with value '
+                + f'{document=}. Try increasing timeout with option "-t". Skipping request.')
+            return set()
+        else:
+            errors = response.json().get("errors", [])
 
     for error in errors:
         error_message = error["message"]
@@ -333,17 +361,24 @@ def probe_typeref(
             http2=config.http2,
             verify=config.verify,
             proxies=config.proxy,
+            timeout=config.timeout,
             ) as client:
         for document in documents:
-            response = graphql.request(
-                client=client,
-                command=config.command,
-                url=config.url,
-                headers=config.headers,
-                params=config.params,
-                json={"query": document},
-            )
-            errors = response.json().get("errors", [])
+            try:
+                response = graphql.request(
+                    client=client,
+                    command=config.command,
+                    url=config.url,
+                    headers=config.headers,
+                    params=config.params,
+                    json={"query": document},
+                )
+            except ReadTimeout:
+                logging.warning('Timeout on function probe_typeref with value '
+                    + f'{document=}. Try increasing timeout with option "-t". Skipping request')
+                return None
+            else:
+                errors = response.json().get("errors", [])
 
             for error in errors:
                 typeref = get_typeref(error["message"], context)
@@ -351,7 +386,8 @@ def probe_typeref(
                     return typeref
 
     if not typeref:
-        raise Exception(f"Unable to get TypeRef for {documents}")
+        #raise Exception(f"Unable to get TypeRef for {documents}")
+        logging.error(f'Unable to get TypeRef for {documents}')
 
     return None
 
@@ -390,16 +426,23 @@ def probe_typename(input_document: str, config: graphql.Config) -> str:
             http2=config.http2,
             verify=config.verify,
             proxies=config.proxy,
+            timeout=config.timeout,
             ) as client:
-        response = graphql.request(
-            client=client,
-            command=config.command,
-            url=config.url,
-            headers=config.headers,
-            params=config.params,
-            json={"query": document},
-        )
-        errors = response.json()["errors"]
+        try:
+            response = graphql.request(
+                client=client,
+                command=config.command,
+                url=config.url,
+                headers=config.headers,
+                params=config.params,
+                json={"query": document},
+            )
+        except ReadTimeout:
+            logging.warning('Timeout on function probe_typename with value '
+                + f'{document=}. Try increasing timeout with option "-t". Skipping request')
+            return None
+        else:
+            errors = response.json().get("errors", [])
 
     wrong_field_regexes = [
         f'Cannot query field "{wrong_field}" on type "(?P<typename>[_0-9a-zA-Z\[\]!]*)".',
@@ -442,16 +485,22 @@ def fetch_root_typenames(config: graphql.Config) -> Dict[str, Optional[str]]:
             http2=config.http2,
             verify=config.verify,
             proxies=config.proxy,
+            timeout=config.timeout,
             ) as client:
         for name, document in documents.items():
-            response = graphql.request(
-                client=client,
-                command=config.command,
-                url=config.url,
-                headers=config.headers,
-                params=config.params,
-                json={"query": document},
-            )
+            try:
+                response = graphql.request(
+                    client=client,
+                    command=config.command,
+                    url=config.url,
+                    headers=config.headers,
+                    params=config.params,
+                    json={"query": document},
+                )
+            except ReadTimeout:
+                logging.warning('Timeout on function fetch_root_typenames with values '
+                    + f'{name=} and {document=}')
+                raise
             try:
                 data = response.json().get("data", {})
             except JSONDecodeError:
@@ -489,6 +538,8 @@ def clairvoyance(
 
     for field_name in valid_mutation_fields:
         typeref = probe_field_type(field_name, config, input_document)
+        if typeref is None:
+            next
         field = graphql.Field(field_name, typeref)
 
         if field.type.name not in ["Int", "Float", "String", "Boolean", "ID"]:
@@ -498,6 +549,8 @@ def clairvoyance(
                 arg_typeref = probe_arg_typeref(
                     field.name, arg_name, config, input_document
                 )
+                if arg_typeref is None:
+                    next
                 arg = graphql.InputValue(arg_name, arg_typeref)
 
                 field.args.append(arg)

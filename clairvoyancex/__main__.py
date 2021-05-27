@@ -2,6 +2,7 @@ import json
 import logging
 import argparse
 import re
+from httpx import Timeout
 from typing import Dict
 
 from clairvoyancex import graphql
@@ -12,7 +13,9 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     defaults = {"document": "query { FUZZ }",
-                "command": "POST"}
+                "command": "POST",
+                "bucket_size": 4096,
+                "timeout": 5}
 
     parser.add_argument("-v", default=0, action="count")
     parser.add_argument(
@@ -20,11 +23,6 @@ def parse_args():
         "--insecure",
         action="store_true",
         help="Disable server's certificate verification",
-    )
-    parser.add_argument(
-        "--http2",
-        action="store_true",
-        help="Enable use of HTTP version 2",
     )
     parser.add_argument(
         "-i",
@@ -46,6 +44,23 @@ def parse_args():
         metavar="<string>",
         default=defaults["document"],
         help=f"Start with this document (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-t",
+        "--timeout",
+        metavar="<timeout>",
+        type=int,
+        default=defaults["timeout"],
+        help="Set global timeout, in seconds (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-w",
+        "--wordlist",
+        metavar="<file>",
+        required=True,
+        type=argparse.FileType("r"),
+        help="This wordlist will be used for all brute force effots"
+                + " (i.e. fields, arguments and so on)",
     )
     parser.add_argument(
         "-x",
@@ -84,13 +99,17 @@ def parse_args():
                 + " (e.g. \"env: prod\"). Can be used mutiple times",
     )
     parser.add_argument(
-        "-w",
-        "--wordlist",
-        metavar="<file>",
-        required=True,
-        type=argparse.FileType("r"),
-        help="This wordlist will be used for all brute force effots"
-                + " (i.e. fields, arguments and so on)",
+        "--http2",
+        action="store_true",
+        help="Enable use of HTTP version 2",
+    )
+    parser.add_argument(
+        "--bucketsize",
+        metavar="<bucket size>",
+        type=int,
+        default=defaults["bucket_size"],
+        help="Max number of items to query per request"
+                + " (default: %(default)s)",
     )
     parser.add_argument("url")
 
@@ -110,12 +129,15 @@ if __name__ == "__main__":
         level = logging.WARNING
     logging.basicConfig(level=level, format=format, datefmt=datefmt)
 
+    timeouts = Timeout(args.timeout)
     config = graphql.Config()
     config.url = args.url
     config.verify = not args.insecure
     config.http2 = args.http2
     config.proxy = args.proxy
     config.command = args.command
+    config.bucket_size = args.bucketsize
+    config.timeout = timeouts
     for h in args.headers:
         key, value = re.split(": ?", h, 1)
         config.headers[key] = value
@@ -138,6 +160,7 @@ if __name__ == "__main__":
             verify=config.verify,
             proxies=config.proxy,
             http2=config.http2,
+            timeout=config.timeout
             ) as client:
         response = graphql.request(
                 client=client,
